@@ -2,10 +2,10 @@ import java.text.DecimalFormat;
 import java.util.*;
 
 class Customer {
-    private Double accNo;
-    private String name;
-    private String password;
-    private static double accCounter = 1000000;
+    private final long accNo;
+    private final String name;
+    private final String password;
+    private static long accCounter = 1000000;
 
     Customer(String name, String password) {
         this.name = name;
@@ -13,7 +13,7 @@ class Customer {
         this.accNo = ++accCounter;
     }
 
-    public Double getAccNo() {
+    public long getAccNo() {
         return accNo;
     }
 
@@ -21,41 +21,45 @@ class Customer {
         return name;
     }
 
-    public String getPassword() {
-        return password;
+    public boolean validatePassword(String inputPassword) {
+        return this.password.equals(inputPassword);
     }
 }
 
-class Account {
-    protected Double balance;
+abstract class Account {
+    protected double balance;
 
     Account(double initialAmount) {
         this.balance = initialAmount;
     }
 
-    public Double getBalance() {
+    public double getBalance() {
         return balance;
     }
 
     public void deposit(double amount) {
-        this.balance += amount;
-        System.out.println("--SUCCESSFULLY DEPOSITED AMOUNT: " + amount+"--");
+        if (amount > 0) {
+            this.balance += amount;
+            System.out.println("--SUCCESSFULLY DEPOSITED: $" + amount + "--");
+        } else {
+            System.out.println("--INVALID DEPOSIT AMOUNT--");
+        }
     }
 
     public void withdraw(double amount) {
-        if (this.balance <= 0) {
-            System.out.println("--INVALID WITHDRAW--");
+        if (amount <= 0) {
+            System.out.println("--INVALID WITHDRAW AMOUNT--");
         } else if (this.balance < amount) {
             System.out.println("--INSUFFICIENT BALANCE--");
         } else {
             this.balance -= amount;
-            System.out.println("--SUCCESSFULLY WITHDRAWN AMOUNT: " + amount+"--");
+            System.out.println("--SUCCESSFULLY WITHDRAWN: $" + amount + "--");
         }
     }
 
     public void showBalance() {
-        DecimalFormat df = new DecimalFormat("#.##");
-        System.out.println("--YOUR CURRENT BALANCE IS: " + df.format(this.balance)+"--");
+        DecimalFormat df = new DecimalFormat("Rs #,##0.00");
+        System.out.println("--YOUR CURRENT BALANCE: " + df.format(this.balance) + "--");
     }
 }
 
@@ -72,96 +76,98 @@ class CheckingAccount extends Account {
 }
 
 class Bank {
-    private List<Customer> customers;
-    private Map<Double, Account> accounts;
-    private Scanner sc;
-
-    Bank() {
-        customers = new ArrayList<>();
-        accounts = new HashMap<>();
-        sc = new Scanner(System.in);
-    }
+    private final List<Customer> customers = new ArrayList<>();
+    private final Map<Long, Account> accounts = new HashMap<>();
+    private final Scanner sc = new Scanner(System.in);
 
     void createAccount() {
-        System.out.println("ENTER YOUR NAME:");
+        System.out.print("Enter your name: ");
         String name = sc.next();
-        System.out.println("ENTER INITIAL AMOUNT:");
+        System.out.print("Enter initial deposit: ");
         double initialAmount = sc.nextDouble();
-        System.out.println("ENTER YOUR PASSWORD:");
-        String password = sc.next();
-        System.out.println("CONFIRM PASSWORD:");
+        
+        String password;
+        while (true) {
+            System.out.print("Create a password (at least 8 characters): ");
+            password = sc.next();
+            if (password.length() >= 8) {
+                break;
+            }
+            System.out.println("--PASSWORD TOO SHORT, PLEASE RE-ENTER--");
+        }
+        
+        System.out.print("Confirm password: ");
         String confirmPassword = sc.next();
+
         if (!password.equals(confirmPassword)) {
-            System.out.println("--PASSWORD NOT MATCHING--");
+            System.out.println("--PASSWORDS DO NOT MATCH, PLEASE TRY AGAIN--");
             return;
         }
 
         Customer customer = new Customer(name, password);
-        Account account;
-        System.out.println("SELECT ACCOUNT TYPE:\n1. SAVING ACCOUNT\n2. CHECKING ACCOUNT");
+        System.out.println("Select account type:\n1. Savings Account\n2. Checking Account");
         int choice = sc.nextInt();
-        if (choice == 1) {
-            account = new SavingsAccount(initialAmount);
-        } else {
-            account = new CheckingAccount(initialAmount);
-        }
+
+        Account account = (choice == 1) ? new SavingsAccount(initialAmount) : new CheckingAccount(initialAmount);
         customers.add(customer);
         accounts.put(customer.getAccNo(), account);
-        System.out.println("--SUCCESSFULLY CREATED YOUR ACCOUNT!!!--");
-        System.out.println("Your account number is " + customer.getAccNo());
+
+        System.out.println("--ACCOUNT CREATED SUCCESSFULLY!--");
+        System.out.println("Your Account Number: " + customer.getAccNo());
     }
 
-    public void login() {
-        System.out.println("ENTER ACCOUNT NUMBER:");
-        Double accNo = sc.nextDouble();
-        System.out.println("ENTER PASSWORD:");
-        String enteredPassword = sc.next();
-
+    void login() {
+        System.out.print("Enter Account Number: ");
+        long accNo = sc.nextLong();
+        
         Customer customer = findCustomer(accNo);
-        if (customer != null && customer.getPassword().equals(enteredPassword)) {
-            System.out.println("--LOGIN SUCCESSFUL--");
-            System.out.println("--WELCOME " + customer.getName()+"--");
-
-            while (true) {
-                System.out.println("SELECT OPERATION:\n1. DEPOSIT\n2. WITHDRAW\n3. BALANCE ENQUIRY\n4. LOGOUT");
-                int op = sc.nextInt();
-
-                Account account = accounts.get(accNo);
-                switch (op) {
-                    case 1:
-                        System.out.println("ENTER AMOUNT TO DEPOSIT:");
-                        double depositAmount = sc.nextDouble();
-                        account.deposit(depositAmount);
-                        break;
-                    case 2:
-                        System.out.println("ENTER AMOUNT TO WITHDRAW:");
-                        double withdrawAmount = sc.nextDouble();
-                        account.withdraw(withdrawAmount);
-                        break;
-                    case 3:
-                        account.showBalance();
-                        break;
-                    case 4:
-                        System.out.println("--LOGGING OUT--");
-                        return;
-                    default:
-                        System.out.println("--INVALID OPERATION--");
-                        break;
-                }
+        if (customer == null) {
+            System.out.println("--INVALID ACCOUNT NUMBER--");
+            return;
+        }
+        
+        Account account = accounts.get(accNo);
+        
+        while (true) {
+            System.out.print("Enter Password: ");
+            String enteredPassword = sc.next();
+            
+            if (customer.validatePassword(enteredPassword)) {
+                System.out.println("--LOGIN SUCCESSFUL. WELCOME " + customer.getName() + "--");
+                break;
+            } else {
+                System.out.println("--INCORRECT PASSWORD, PLEASE TRY AGAIN--");
             }
-        } else {
-            System.out.println("--INVALID ACCOUNT NUMBER OR PASSWORD--");
-            System.out.println("--LOGIN UNSUCCESSFUL!!!--");
+        }
+
+        while (true) {
+            System.out.println("Select Operation:\n1. Deposit\n2. Withdraw\n3. Balance Enquiry\n4. Logout");
+            int op = sc.nextInt();
+
+            switch (op) {
+                case 1:
+                    System.out.print("Enter amount to deposit: ");
+                    account.deposit(sc.nextDouble());
+                    break;
+                case 2:
+                    System.out.print("Enter amount to withdraw: ");
+                    account.withdraw(sc.nextDouble());
+                    break;
+                case 3:
+                    account.showBalance();
+                    break;
+                case 4:
+                    System.out.println("--LOGGING OUT--");
+                    return;
+                default:
+                    System.out.println("--INVALID OPTION--");
+                    break;
+            }
         }
     }
 
-    private Customer findCustomer(double accNo) {
-        for (Customer c : customers) {
-            if (c.getAccNo().equals(accNo)) {
-                return c;
-            }
-        }
-        return null;
+    private Customer findCustomer(long accNo) {
+        return customers.stream().filter(c -> c.getAccNo() == accNo).findFirst().orElse(null);
     }
 
     public static void main(String[] args) {
@@ -169,9 +175,9 @@ class Bank {
         Bank bank = new Bank();
 
         while (true) {
-            System.out.println("***WELCOME TO BANK ACCOUNT MANAGEMENT SYSTEM!!!***");
-            System.out.println("1. CREATE NEW ACCOUNT\n2. LOGIN\n3. EXIT");
-            System.out.println("ENTER YOUR CHOICE");
+            System.out.println("*** BANK MANAGEMENT SYSTEM ***");
+            System.out.println("1. Create New Account\n2. Login\n3. Exit");
+            System.out.print("Enter your choice: ");
             int choice = sc.nextInt();
 
             switch (choice) {
@@ -182,7 +188,7 @@ class Bank {
                     bank.login();
                     break;
                 case 3:
-                    System.out.println("**THANK YOU FOR USING OUR BANKING SYSTEM***");
+                    System.out.println("** Thank you for using our banking system **");
                     sc.close();
                     return;
                 default:
